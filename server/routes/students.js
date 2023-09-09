@@ -5,16 +5,25 @@ const router = express.Router();
 // Import model(s)
 const { Student } = require('../db/models');
 const { Op } = require("sequelize");
+let errorResult = { errors: [], count: 0, pageCount: 0 };
 
 // List
 router.get('/', async (req, res, next) => {
-    let errorResult = { errors: [], count: 0, pageCount: 0 };
     let { page, size } = req.query
     if (page) {
         page = parseInt(req.query.page)
     }
     if (size) {
         size = parseInt(req.query.size);
+    }
+    if (!page || !size) {
+        errorResult.count = 267,
+        errorResult.pageCount = 0,
+        errorResult.status = 400
+        throw new Error('Requires valid page and size params')
+    }
+    if ((size <= 0 || page <= 0) && !(size === 0 && page === 0)) {
+        throw new Error('Requires valid page and size params');
     }
     isNaN(page) ? page = 1 : page = page
     isNaN(size) ? size = 10 : size = size
@@ -23,16 +32,9 @@ router.get('/', async (req, res, next) => {
 
     let limit = size;
     let offset = limit * (page - 1);
-    if (!page || !size) {
-        const errorResult =  {
-            errors: [{message: 'Requires valid page and size params'}],
-            count: 0,
-            pageCount: 0
-        }
 
-        return res.status(400).json(errorResult)
 
-    }
+        // return res.status(400).json(errorResult)
     // Phase 2B: Calculate limit and offset
     // Phase 2B (optional): Special case to return all students (page=0, size=0)
     // Phase 2B: Add an error message to errorResult.errors of
@@ -89,6 +91,8 @@ router.get('/', async (req, res, next) => {
     // Phase 3A: Include total number of results returned from the query without
     // limits and offsets as a property of count on the result
     // Note: This should be a new query
+    result.count = await Student.count('id')
+
     result.page = page;
     result.size = size;
     result.rows = await Student.findAll({
@@ -128,12 +132,15 @@ router.get('/', async (req, res, next) => {
             pageCount: 10 // total number of available pages for this query
         }
     */
-    // Your code here
+    result.pageCount = Math.ceil(result.count / limit)
 
     res.json(result);
 });
 
-
+router.use((err, req, res, next) => {
+    errorResult.errors.push(err.message)
+    res.json(errorResult)
+})
 
 // Export class - DO NOT MODIFY
 module.exports = router;
